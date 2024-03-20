@@ -39,7 +39,7 @@ auto CPU::readCPU(n24 address, n8 data) -> n8 {
   case 0x4213: return io.pio;  //RDIO
 
   case 0x4214: return io.rddiv.byte(0);  //RDDIVL
-  case 0x4215: return 0xff; //io.rddiv.byte(1);  //RDDIVH
+  case 0x4215: return 0xf0; //io.rddiv.byte(1);  //RDDIVH
   case 0x4216: return io.rdmpy.byte(0);  //RDMPYL
   case 0x4217: return io.rdmpy.byte(1);  //RDMPYH
 
