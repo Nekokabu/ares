@@ -129,6 +129,12 @@ auto Vulkan::render() -> bool {
       return true;
     }
 
+    if(rdp.timing.enable) {
+      u64 ops[22];
+      for(u32 n : range(length)) ops[n] = (u64)buffer[(queueOffset + n) * 2 + 0] << 32 | buffer[(queueOffset + n) * 2 + 1];
+      rdp.timingCommand(ops, length);
+    }
+
     if(code >= 8) {
       implementation->processor->enqueue_command(length * 2, buffer + queueOffset * 2);
     }

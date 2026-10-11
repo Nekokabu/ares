@@ -189,7 +189,24 @@ auto RDP::render() -> void {
     rectangle.t.f  = n16(op >>  0);
   };
 
+  static const u8 commandLength[64] = {
+    1, 1, 1, 1, 1, 1, 1, 1, 4, 6,12,14,12,14,20,22,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  };
+
   while(command.current < command.end) {
+    if(timing.enable) {
+      //feed the complete command to the timing model before executing it
+      u64 ops[22];
+      u32 code = memory.readUnaligned<Dual>(command.current) >> 56 & 0x3f;
+      u32 length = commandLength[code];
+      if(command.current + length * 8 <= command.end) {
+        for(u32 n : range(length)) ops[n] = memory.readUnaligned<Dual>(command.current + n * 8);
+        timingCommand(ops, length);
+      }
+    }
     u64 op = fetch();
     auto opCode = op >> 56 & 0x3f;
 
@@ -615,6 +632,8 @@ auto RDP::syncTile() -> void {
 
 //0x29
 auto RDP::syncFull() -> void {
+  if(!timing.enable) timing.syncFullCount++;
+  if(timing.enable) return;  //completion is signaled by the timing model (timingComplete)
   if(!command.crashed) {
     mi.raise(MI::IRQ::DP);
     command.bufferBusy = 0;

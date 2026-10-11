@@ -17,6 +17,34 @@ auto RDP::serialize(serializer& s) -> void {
   s(command.ready);
   s(command.crashed);
 
+  s(timing.cycleType);
+  s(timing.imageRead);
+  s(timing.zCompare);
+  s(timing.zUpdate);
+  s(timing.colorSize);
+  s(timing.colorWidth);
+  s(timing.colorAddress);
+  s(timing.textureSize);
+  s(timing.textureWidth);
+  s(timing.textureAddress);
+  s(timing.scissorX0);
+  s(timing.scissorY0);
+  s(timing.scissorX1);
+  s(timing.scissorY1);
+  s(timing.mode);
+  s(timing.memoryBound);
+  s(timing.pipeCycles);
+  s(timing.accumulated);
+  s(timing.zPassFraction);
+  s(timing.frameZPixels);
+  s(timing.submitted);
+  s(timing.completed);
+  s(timing.pending);
+  s(timing.syncQueued);
+  s(timing.syncTargets);
+  s(timing.framePixels);
+  s(timing.frameCycles);
+
   s(edge.lmajor);
   s(edge.level);
   s(edge.tile);

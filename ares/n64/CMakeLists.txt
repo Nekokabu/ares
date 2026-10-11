@@ -240,6 +240,8 @@ ares_add_sources(
     rdp/rdp.hpp
     rdp/render.cpp
     rdp/serialization.cpp
+    rdp/timing.cpp
+    rdp/timing-model.hpp
 )
 
 ares_add_sources(

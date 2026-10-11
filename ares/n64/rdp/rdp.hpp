@@ -69,8 +69,65 @@ struct RDP : Thread, Memory::RCP<RDP> {
   auto writeWord(u32 address, u32 data, Thread& thread) -> void;
   auto flushCommands() -> void;
 
+  //timing.cpp
+  auto timingReset() -> void;
+  auto timingCommand(const u64* ops, u32 length) -> void;
+  auto timingSyncFull() -> void;
+  auto timingStep(u32 clocks) -> u32;
+  auto timingComplete() -> void;
+  auto timingTriangle(const u64* ops, bool shade, bool texture, bool zbuffer) -> void;
+  auto timingRectangle(s32 x0, s32 y0, s32 x1, s32 y1, bool fill) -> void;
+  auto timingMode() -> u32;
+  auto timingScale(bool memoryBound) -> f64;
+  auto timingSpan(s32 x, s32 y, u32 pixels) -> f64;
+  auto timingAdd(f64 cycles) -> void;
+
   //serialization.cpp
   auto serialize(serializer&) -> void;
+
+  //RDP command timing model: estimates how long the RDP is busy executing the
+  //command stream so that pipe/buffer busy flags and the DP interrupt (Sync_Full)
+  //are delayed accordingly rather than completing instantly.
+  struct Timing {
+    //tunables
+    bool   enable = true;
+    f64    contentionZ = 1.13;     //measured slowdown of read-modify-write spans (image read / depth) by the RDRAM traffic of a running game
+    f64    contentionPlain = 1.19; //the same for write-only spans (plain 1/2-cycle, fill, copy) and TMEM loads
+    f64    viFactor = 1.07;        //measured slowdown of read-modify-write spans with the VI scanning out a frame (write-only spans: none)
+    f64    spanPenalty = 40.0;     //measured extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (scattered primitives: 35-50, triangle strips: 13-26)
+    f64    zPassFraction = 0.75;   //share of depth-tested pixels that pass (estimated from overdraw when zPassAuto)
+    bool   zPassAuto = true;
+    u64    frameZPixels;           //depth-tested pixels drawn since the last Sync_Full
+
+    //state decoded from the command stream (only what the model needs)
+    n2     cycleType;
+    n1     imageRead;
+    n1     zCompare;
+    n1     zUpdate;
+    n2     colorSize;              //0=4bpp 1=8bpp 2=16bpp 3=32bpp
+    n10    colorWidth;
+    n26    colorAddress;
+    n2     textureSize;
+    n10    textureWidth;
+    n26    textureAddress;
+    s32    scissorX0, scissorY0, scissorX1, scissorY1;
+    u32    mode;                   //rdp_tm_mode derived from the state above
+    bool   memoryBound;            //'mode' reads the color or depth buffer for every pixel
+    f64    pipeCycles;             //pixel-pipeline floor per pixel for 'mode'
+    f64    accumulated;            //fractional RDP clocks not yet submitted
+
+    //work accounting, in system clocks (3 per RDP clock)
+    u64    submitted;              //total work submitted
+    u64    completed;              //total work completed
+    u64    pending;                //submitted - completed
+    u64    syncTargets[8];         //'submitted' snapshot at each pending Sync_Full
+    u32    syncQueued;             //number of Sync_Full commands whose interrupt is still pending
+
+    //statistics for the current frame (debug/trace)
+    u64    framePixels;
+    u64    frameCycles;
+    u64    syncFullCount;         //total Sync_Full commands seen (statistics)
+  } timing;
 
   struct Command {
     n24 start;
