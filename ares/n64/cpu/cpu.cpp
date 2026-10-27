@@ -192,6 +192,15 @@ auto CPU::icacheFillLine(u64 vaddr, u32 paddr) -> void {
   icache.line(vaddr).fill(paddr, *this);
 }
 
+auto CPU::rdpBusyStall(u32 cycles) -> u32 {
+  return rdp.timing.enable && rdp.timing.pending && !rdp.command.freeze ? cycles : 0;
+}
+
+//the recompiler's inline instruction cache fill: the stall part of the fill time
+auto CPU::icacheStall() -> void {
+  if(u32 cycles = rdpBusyStall(ICacheFillStall)) step(cycles * 2);
+}
+
 template<bool Recompiled>
 auto CPU::instructionEpilogue() -> void {
   if constexpr(!Recompiled) {

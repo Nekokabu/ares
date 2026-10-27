@@ -54,6 +54,13 @@ struct CPU : Thread {
   auto raiseCoprocessor1Exception() -> void;
   auto icacheFillLine(u64 vaddr, u32 paddr) -> void;
 
+  //cache line transfers wait for RDRAM behind the RDP while it is drawing (measured on
+  //hardware with rdp_timing v8: an instruction cache fill takes 10 CPU cycles longer, a
+  //data cache fill 4, a data cache write-back 12; otherwise the CPU is not slowed down)
+  auto rdpBusyStall(u32 cycles) -> u32;
+  auto icacheStall() -> void;
+  enum : u32 { ICacheFillStall = 10, DCacheFillStall = 4, DCacheWriteBackStall = 12 };
+
   auto power(bool reset) -> void;
 
   struct Pipeline {
@@ -206,7 +213,7 @@ struct CPU : Thread {
       }
 
       auto fill(u32 paddr, CPU& cpu) -> void {
-        cpu.step(48 * 2);
+        cpu.step((48 + cpu.rdpBusyStall(ICacheFillStall)) * 2);
         const u32 tag = paddr & ~0x0000'0fffu;
         tagKey = tag;
         setValid(true);
