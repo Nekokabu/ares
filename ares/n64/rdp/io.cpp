@@ -55,7 +55,7 @@ auto RDP::readWord(u32 address, Thread& thread) -> u32 {
     if(&thread == &cpu) cpu.forceSynchronize();
   }
 
-  if(data == 7) {
+  if(address == 7) {
     //DPC_TMEM_BUSY
     data.bit(0,23) = command.tmemBusy;
     if(&thread == &cpu) cpu.forceSynchronize();
