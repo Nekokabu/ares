@@ -694,7 +694,7 @@ auto CPU::Recompiler::emit(u64 vaddr, u32 address, u64 stateKey) -> Block* {
         if(fn <= 0x03 || fn >= 0x30) need = max(need, ready[ft]);
         s64 stall = max<s64>(0, need - t);
         fpuStall[i] = (u32)stall; t += stall;
-        u32 issue = lat <= 3 ? 2 : lat;   //add/sub/mul issue 2; conversions (5) and div/sqrt are not pipelined
+        u32 issue = lat == 4 ? 3 : lat >= 6 ? lat - 1 : lat;   //add/sub 3, mul 5/8, div and sqrt 29/58, conversions 5, moves 1 (fpuLatency is one more where a dependent instruction waits)
         if(fn < 0x30) ready[fd] = t + lat;
         t += issue;
       } else if(op == 0x31 || op == 0x35) {  //LWC1/LDC1

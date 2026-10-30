@@ -107,7 +107,8 @@ struct RDP : Thread, Memory::RCP<RDP> {
     //RDP clocks lost to each transfer of another bus master while it has work in flight (rdp_timing v10, RDP drawing a game list):
     f64    contendCpu = 11.7;      //a CPU data cache line fill (16 bytes)
     f64    contendCpuI = 8.5;      //a CPU instruction cache line fill (32 bytes)
-    f64    contendCpuW = 5.0;      //a CPU data cache write-back (16 bytes)
+    f64    contendCpuW = 1.0;      //a CPU data cache write-back (16 bytes; rdp_timing v17: a random load+store loop costs the RDP about two fills' worth, not two fills and two write-backs)
+    f64    contendCpuU = 4.0;      //an uncached CPU write (rdp_timing v17: 2.7 with the VI off, 5 in the games' VI mode)
     f64    contendDma = 1.22;      //per 8 bytes of SP DMA (64 B: 10, 512 B: 77, 4 KiB: 656)
     f64    spanPenalty = 15.0;     //extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (rdp_timing v9: the game lists need 15 on top of the stacked-primitive tables)
     f64    zPassFraction = 0.75;   //share of depth-tested pixels that pass (estimated from overdraw when zPassAuto)

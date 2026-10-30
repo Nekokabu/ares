@@ -1072,7 +1072,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FADD_S, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth32, self.fpuCycles(2),
+      Fdn, {Fsn, Ftn}, FpuWidth32, self.fpuCycles(3),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1089,7 +1089,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FSUB_S, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth32, self.fpuCycles(2),
+      Fdn, {Fsn, Ftn}, FpuWidth32, self.fpuCycles(3),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1106,7 +1106,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FMUL_S, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth32, self.fpuCycles(2),
+      Fdn, {Fsn, Ftn}, FpuWidth32, self.fpuCycles(5),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1595,7 +1595,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FADD_D, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(2),
+      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(3),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1612,7 +1612,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FSUB_D, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(2),
+      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(3),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1629,7 +1629,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FMUL_D, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(2),
+      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(8),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1646,7 +1646,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FDIV_D, imm(Fdn), imm(Fsn), imm(Ftn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(30),
+      Fdn, {Fsn, Ftn}, FpuWidth64, self.fpuCycles(58),
       FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
@@ -1663,7 +1663,7 @@ auto CPU::Recompiler::emitFPU(u32 instruction, EmitPcMode pcMode) -> EmitExecute
         callf(&CPU::FSQRT_D, imm(Fdn), imm(Fsn));
         return EmitExecuteResult::MayFault;
       },
-      Fdn, {Fsn}, FpuWidth64, self.fpuCycles(30), FpuCheckSnan,
+      Fdn, {Fsn}, FpuWidth64, self.fpuCycles(58), FpuCheckSnan,
       fpuDiv0Mask | fpuOverflowMask | fpuUnderflowMask | fpuInexactMask,
       [&]() -> void {
         fsqrt64_f0();

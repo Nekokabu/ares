@@ -242,6 +242,10 @@ auto CPU::CACHE(u8 operation, cr64& rs, s16 imm) -> void {
   }
 
   }
+  //a cache operation costs 5 cycles (cpu_timing v18); a dirty line it wrote back leaves through the
+  //write buffer once the bus is free
+  step(3 * 2);
+  if(wbPending) { busWait(); postWriteBack(); }
 }
 
 auto CPU::DADD(r64& rd, cr64& rs, cr64& rt) -> void {

@@ -170,6 +170,7 @@ auto CPU::read(PhysAccess access) -> maybe<u64> {
   u32 paddr = access.paddr;
   if(context.littleEndian()) paddr = reverseEndianPaddr<Size>(paddr);
   if(access.cache) return dcache.read<Size>(access.vaddr, paddr);
+  busWait();  //a read waits for the writes posted before it (v14/v18)
   if(paddr < 0x03f0'0000) step(UncachedReadCycles * 2);  //RDRAM: the RCP devices charge their own cost
   return busRead<Size>(paddr);
 }
@@ -191,6 +192,7 @@ auto CPU::write(PhysAccess access, u64 data) -> bool {
   u32 paddr = access.paddr;
   if(context.littleEndian()) paddr = reverseEndianPaddr<Size>(paddr);
   if(access.cache) return dcache.write<Size>(access.vaddr, paddr, data), true;
+  postWrite(paddr);  //the write buffer (v18)
   return busWrite<Size>(paddr, data), true;
 }
 

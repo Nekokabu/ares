@@ -209,9 +209,10 @@ auto CPU::fpuLatency(u32 instruction) const -> u32 {
   u32 fmt = instruction >> 21 & 31, fn = instruction & 0x3f;
   bool dbl = fmt == 17 || fmt == 21;
   switch(fn) {
-  case 0x00: case 0x01: case 0x02: return 3;          //add, sub, mul
-  case 0x03: return dbl ? 30 : 29;                    //div (div.s measured 28-29; div.d assumed like sqrt.d)
-  case 0x04: return dbl ? 30 : 29;                    //sqrt (measured 28-29 and 30)
+  case 0x00: case 0x01: return 4;                     //add, sub: issue 3, a dependent instruction waits 1 more (v18)
+  case 0x02: return dbl ? 9 : 6;                      //mul.s 5 / mul.d 8, +1 dependent (v18; 2 with a 0.0 / 1.0 / power-of-two operand)
+  case 0x03: return dbl ? 59 : 30;                    //div.s 29 / div.d 58, +1 dependent (v18; 2 with a 0.0 dividend)
+  case 0x04: return dbl ? 59 : 30;                    //sqrt.s 29 / sqrt.d 58 (v18; 2 for sqrt(0.0))
   case 0x05: case 0x06: case 0x07: return 1;          //abs, mov, neg
   case 0x08: case 0x09: case 0x0a: case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f: return 5;  //round/trunc/ceil/floor
   case 0x20: case 0x21: case 0x24: case 0x25: return 5;  //cvt
@@ -254,9 +255,38 @@ auto CPU::icacheBusyStall() -> u32 {
   return r;
 }
 
+//a dirty line leaves the write buffer: the bus is busy for the 16-byte write (the CPU itself paid
+//WriteBufferCycles when the line was evicted)
+auto CPU::postWriteBack() -> void {
+  wbPending = false;
+  viStallCycles = ViStallWriteBack;
+  s64 now = busNow();
+  busFreeAt = (busFreeAt > now ? busFreeAt : now) + (DCacheWriteBackCycles + rdpBusyStall(DCacheWriteBackStall, rdp.timing.contendCpuW)) * 2;
+  viStallCycles = ViStallFill;
+}
+
+//an uncached RDRAM or RCP register store enters the write buffer (cpu_timing v18)
+auto CPU::postWrite(u32 paddr) -> void {
+  s64 now = busNow();
+  if(wbPending) { busWait(); postWriteBack(); busWait(); now = busNow(); }   //the pending write-back drains first
+  while(wbCount && wbDone[wbHead] <= now) { wbHead = wbHead + 1 & 3; wbCount--; }
+  if(wbCount >= WriteBufferEntries) {                                        //full: wait for the oldest entry
+    step((u32)(wbDone[wbHead] - now)); now = busNow();
+    wbHead = wbHead + 1 & 3; wbCount--;
+  }
+  u32 cycles;
+  if(paddr < 0x03f0'0000) cycles = UncachedWriteCycles + rdpBusyStall(UncachedWriteStall, rdp.timing.contendCpuU);
+  else if((paddr & 0xfff0'0000) == 0x0430'0000) cycles = MiWriteCycles;
+  else cycles = RcpWriteCycles;
+  s64 start = busFreeAt > now ? busFreeAt : now;
+  s64 done = start + cycles * 2;
+  wbDone[wbHead + wbCount & 3] = done; wbCount++;
+  busFreeAt = done;
+}
+
 //the recompiler's inline instruction cache fill: the stall part of the fill time
 auto CPU::icacheStall() -> void {
-  busWait();
+  busWaitFill();
   if(u32 cycles = rdpBusyStall(ICacheFillStall, rdp.timing.contendCpuI)) step(cycles * 2);
 }
 

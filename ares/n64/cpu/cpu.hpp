@@ -66,22 +66,40 @@ struct CPU : Thread {
   enum : u32 { ICacheFillCycles = 48, DCacheFillCycles = 40, DCacheWriteBackCycles = 25 };  //cpu_timing v14: fill 41 incl. the load, write-back 25
   enum : u32 { ViStallFill = 6, ViStallIFill = 6, ViStallWriteBack = 2 };
   u32 viStallCycles = ViStallFill;  //the VI part of the stall for the transfer in progress
-  //a dirty line is filled first and written back from the write buffer afterwards; the CPU pays
-  //'WriteBufferCycles' and the next line transfer waits until the bus is free again (v14: a dirty
-  //miss costs 66 cycles against 41 for a clean one)
-  enum : u32 { WriteBufferCycles = 4 };
+  //The write buffer (cpu_timing v14/v18). Stores that leave the CPU (uncached RDRAM, RCP registers,
+  //dirty cache lines) are posted to a 4-entry buffer and drained in order: an uncached RDRAM word
+  //occupies the bus for 16 cycles (a 16-byte line 17), an SP/DP register write 10, an MI register 2.
+  //The CPU only waits when the buffer is full (the 5th store of a burst), when a line fill or an
+  //uncached read needs the bus (they wait for everything posted before them; a fill that follows a
+  //write also pays the 9-cycle turnaround of the RDRAM bus), and when a store follows a dirty-line
+  //write-back that has not left yet. A dirty line is filled first and written back afterwards; the
+  //CPU pays 'WriteBufferCycles' for that (v14: a dirty miss costs 66 cycles against 41 for a clean
+  //one when the next fill follows at once, 6 more than a clean one when it comes 32 cycles later).
+  enum : u32 { WriteBufferCycles = 6, WriteBufferEntries = 4 };
+  enum : u32 { UncachedWriteCycles = 16, RcpWriteCycles = 10, MiWriteCycles = 2, BusTurnaroundCycles = 9 };
+  enum : u32 { UncachedWriteStall = 15 };  //while the RDP draws (rdp_timing v17: 33 cycles per uncached write)
   s64 clockEpoch = 0;          //Thread::clock is reset at every synchronize(); epoch + clock is monotonic
-  s64 busFreeAt = 0;
-  bool wbPending = false;
+  s64 busFreeAt = 0;           //when the last posted write leaves the bus
+  s64 wbDone[WriteBufferEntries] = {}; u32 wbHead = 0, wbCount = 0;
+  bool wbPending = false;      //a dirty line waits to be written back after the fill that evicted it
   auto busNow() const -> s64 { return clockEpoch + Thread::clock; }
-  auto busWait() -> void { s64 now = busNow(); if(busFreeAt > now) step((u32)(busFreeAt - now)); }
+  auto busWait() -> void { s64 now = busNow(); if(busFreeAt > now) step((u32)(busFreeAt - now)); wbCount = 0; }
+  auto busWaitFill() -> void {
+    s64 now = busNow(), until = busFreeAt + BusTurnaroundCycles * 2;
+    if(busFreeAt > now - BusTurnaroundCycles * 2 && until > now) step((u32)(until - now));
+    wbCount = 0;
+  }
+  auto postWrite(u32 paddr) -> void;
+  auto postWriteBack() -> void;
   //an uncached RDRAM read stalls the pipeline for 32 cycles in all (cpu_timing v14; nemu64-test agrees)
   enum : u32 { UncachedReadCycles = 31 };
-  //FPU costs measured with cpu_timing v11/v14: the FPU is pipelined. add/sub/mul (single and double)
-  //issue in 2 cycles and their result is ready 3 cycles after issue; conversions take 5; div.s and
-  //sqrt.s 29, the double forms 30; compares 1. 'issue' is what the instruction itself costs, the
-  //dependency stalls are scheduled per block by the recompiler (fpuLatency) and are not charged by
-  //the interpreter.
+  //FPU costs measured with cpu_timing v11/v14/v18. With ordinary operands add/sub (single and
+  //double) issue in 3 cycles, mul.s in 5, mul.d in 8, div.s and sqrt.s in 29, div.d and sqrt.d in
+  //58, conversions in 5, compares in 1; a dependent instruction waits one more cycle (v18). The
+  //hardware has fast paths for trivial operands (adding 0.0, multiplying by 0.0, 1.0 or a power of
+  //two, dividing 0.0, sqrt(0.0): 2 cycles) that are not modelled. 'issue' is what the instruction
+  //itself costs, the dependency stalls are scheduled per block by the recompiler (fpuLatency) and
+  //are not charged by the interpreter.
   auto fpuCycles(u32 issue) const -> u32 { return (issue - 1) * 2; }
   auto fpuLatency(u32 instruction) const -> u32;
   //pipeline hazards measured with cpu_timing v11/v14: a load followed by an instruction that uses
@@ -242,7 +260,7 @@ struct CPU : Thread {
       }
 
       auto fill(u32 paddr, CPU& cpu) -> void {
-        cpu.busWait();
+        cpu.busWaitFill();
         cpu.step((ICacheFillCycles + cpu.icacheBusyStall()) * 2);
         const u32 tag = paddr & ~0x0000'0fffu;
         tagKey = tag;
