@@ -1,4 +1,5 @@
 auto RSP::dmaQueue(u32 clocks, Thread& thread) -> void {
+  if(rdp.timing.enable && vi.active()) clocks = (u32)(clocks * (vi.io.antialias < 2 ? DmaViFactor : DmaViFactorAA3));
   dma.clock = (Thread::clock - thread.clock) - clocks;
 }
 
@@ -17,8 +18,8 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
     dma.current = dma.pending;
     dma.busy    = dma.full;
     dma.full    = {0,0};
-    dmaQueue((dma.current.length+8) / 8 * DmaClocksPer8Bytes + DmaClocksPerTransfer, thread);
-    rdp.timingDelay((dma.current.length+8) / 8 * rdp.timing.contendDma);  //the RDP loses the bus meanwhile
+    dmaQueue(dmaClocks(dma.current.length) + DmaClocksPerTransfer, thread);
+    rdp.timingDelay(rdp.timing.contendDmaBase + (dma.current.length+8) / 8 * rdp.timing.contendDma);  //the RDP loses the bus meanwhile
   }
 }
 
@@ -65,8 +66,8 @@ auto RSP::dmaTransferStep() -> void {
   if(dma.current.count) {
     dma.current.count -= 1;
     dma.current.dramAddress += dma.current.skip;
-    dmaQueue((dma.current.length+8) / 8 * DmaClocksPer8Bytes, *this);
-    rdp.timingDelay((dma.current.length+8) / 8 * rdp.timing.contendDma);
+    dmaQueue(dmaClocks(dma.current.length), *this);
+    rdp.timingDelay(rdp.timing.contendDmaBase + (dma.current.length+8) / 8 * rdp.timing.contendDma);
   } else {
     dma.busy = {0,0};
     dma.current.length = 0xFF8;

@@ -196,6 +196,10 @@ auto CPU::icacheFillLine(u64 vaddr, u32 paddr) -> void {
 auto CPU::rdpBusyStall(u32 cycles, f64 rdpClocks) -> u32 {
   u32 total = 0;
   if(rdp.timing.enable && vi.active() && vi.io.antialias < 2) total += viStallCycles;  //the VI's three-line fetch
+  if(rdp.timing.enable && rsp.dma.busy.any()) {  //an SP DMA in flight: the two transfers delay each other (rsp_timing v19)
+    rsp.dma.clock -= RSP::DmaCpuPenaltyClocks;
+    total += RSP::DmaCpuStallCycles;
+  }
   if(rdp.timing.enable && rdp.timing.pending && !rdp.command.freeze) {
     rdp.timingDelay(rdpClocks * rdp.contendScale());  //and the RDP loses the bus for the transfer
     total += cycles;

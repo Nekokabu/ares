@@ -109,7 +109,8 @@ struct RDP : Thread, Memory::RCP<RDP> {
     f64    contendCpuI = 8.5;      //a CPU instruction cache line fill (32 bytes)
     f64    contendCpuW = 1.0;      //a CPU data cache write-back (16 bytes; rdp_timing v17: a random load+store loop costs the RDP about two fills' worth, not two fills and two write-backs)
     f64    contendCpuU = 4.0;      //an uncached CPU write (rdp_timing v17: 2.7 with the VI off, 5 in the games' VI mode)
-    f64    contendDma = 1.22;      //per 8 bytes of SP DMA (64 B: 10, 512 B: 77, 4 KiB: 656)
+    f64    contendDma = 1.2;       //per 8 bytes of SP DMA, plus contendDmaBase per transfer: the RDP only gets about 36 clocks of
+    f64    contendDmaBase = 6.0;   //bus between two back-to-back DMAs whatever their size (rsp_timing v19b: 8 B 6, 64 B 10, 512 B 76, 3.5 KiB 549)
     f64    spanPenalty = 15.0;     //extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (rdp_timing v9: the game lists need 15 on top of the stacked-primitive tables)
     f64    zPassFraction = 0.75;   //share of depth-tested pixels that pass (estimated from overdraw when zPassAuto)
     bool   zPassAuto = true;

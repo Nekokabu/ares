@@ -57,7 +57,7 @@ auto RDP::timingReset() -> void {
   timing.contendCpu = t.contendCpu; timing.contendCpuI = t.contendCpuI; timing.contendCpuW = t.contendCpuW; timing.contendCpuU = t.contendCpuU;
   timing.viFactorAA3 = t.viFactorAA3; timing.viFactorAA2 = t.viFactorAA2; timing.viFactorAA0 = t.viFactorAA0;
   timing.viWidthScale = t.viWidthScale; timing.viContendScale = t.viContendScale;
-  timing.contendDma = t.contendDma;
+  timing.contendDma = t.contendDma; timing.contendDmaBase = t.contendDmaBase;
   timing.zPassFraction = t.zPassFraction;
   timing.zPassAuto = t.zPassAuto;
   timing.colorSize = 2;

@@ -261,9 +261,17 @@ struct RSP : Thread, Memory::RCP<RSP> {
   } pipeline;
 
   //dma.cpp
-  //an SP DMA takes 38 RSP cycles plus 0.155 per byte on hardware (rsp_timing v16: 8 B 38, 64 B 44,
-  //256 B 70, 1 KiB 186, 3.5 KiB 588; writes to RDRAM 32 + 0.145/B), in system clocks (3 per RSP cycle):
-  enum : u32 { DmaClocksPer8Bytes = 4, DmaClocksPerTransfer = 114 };
+  //an SP DMA takes 38 RSP cycles plus 0.15 per byte on hardware (rsp_timing v16/v19b: 8 B 38, 64 B 44,
+  //256 B 70, 512 B 108, 1 KiB 186, 3.5 KiB 581; writes to RDRAM 32 + 0.145/B), in system clocks (3 per
+  //RSP cycle): 114 + 3.6 per 8 bytes
+  enum : u32 { DmaClocksPerTransfer = 114 };
+  static constexpr auto dmaClocks(u32 length) -> u32 { return (length + 8) * 9 / 20; }  //3.6 per 8 bytes
+  //the DMA shares RDRAM with the VI and the CPU (rsp_timing v19): in the games' 320x240 AA modes it takes
+  //18% longer (4% in the ROM's replicate mode), and every CPU cache line transfer that overlaps it delays
+  //it by about 18 RCP clocks while that transfer itself waits about 19 CPU cycles (a 3.5 KiB DMA beside a
+  //CPU chasing pointers takes 1.94x as long, and the CPU's fills 65 cycles instead of 46)
+  static constexpr f64 DmaViFactor = 1.12, DmaViFactorAA3 = 1.04;
+  enum : u32 { DmaCpuPenaltyClocks = 54, DmaCpuStallCycles = 19 };  //54 system clocks = 18 RCP clocks
   auto dmaQueue(u32 clocks, Thread& thread) -> void;
   auto dmaStep(u32 clocks) -> void;
   auto dmaTransferStart(Thread& thread) -> void;
