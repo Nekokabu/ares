@@ -4,7 +4,15 @@ auto CPU::DataCache::Line::hit(u32 paddr) const -> bool {
 }
 
 auto CPU::DataCache::Line::fill(u32 paddr) -> void {
-  cpu.step((40 + cpu.rdpBusyStall(DCacheFillStall)) * 2);
+  cpu.busWait();
+  cpu.step((CPU::DCacheFillCycles + cpu.rdpBusyStall(CPU::DCacheFillStall, rdp.timing.contendCpu)) * 2);
+  if(cpu.wbPending) {
+    //the line evicted by this fill is written from the write buffer after the fill; the bus stays busy
+    cpu.wbPending = false;
+    cpu.viStallCycles = CPU::ViStallWriteBack;
+    cpu.busFreeAt = cpu.busNow() + (CPU::DCacheWriteBackCycles + cpu.rdpBusyStall(CPU::DCacheWriteBackStall, rdp.timing.contendCpuW)) * 2;
+    cpu.viStallCycles = CPU::ViStallFill;
+  }
   const u32 tag = paddr & ~0x0000'0fffu;
   dirty  = 0;
   tagKey = tag;
@@ -13,7 +21,9 @@ auto CPU::DataCache::Line::fill(u32 paddr) -> void {
 }
 
 auto CPU::DataCache::Line::writeBack() -> void {
-  cpu.step((40 + cpu.rdpBusyStall(DCacheWriteBackStall)) * 2);
+  if(cpu.wbPending) cpu.busWait();  //two evictions without a fill between them: the buffer holds one line
+  cpu.step(CPU::WriteBufferCycles * 2);
+  cpu.wbPending = true;
   const u32 tag = tagKey & ~0x0000'0fffu;
   cpu.busWriteBurst<DCache>(tag | index, words);
 }

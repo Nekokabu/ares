@@ -79,8 +79,11 @@ struct RDP : Thread, Memory::RCP<RDP> {
   auto timingRectangle(s32 x0, s32 y0, s32 x1, s32 y1, bool fill) -> void;
   auto timingMode() -> u32;
   auto timingScale(bool memoryBound) -> f64;
+  auto viModeFactor() -> f64;
+  auto contendScale() -> f64;
   auto timingSpan(s32 x, s32 y, u32 pixels) -> f64;
   auto timingAdd(f64 cycles) -> void;
+  auto timingDelay(f64 cycles) -> void;
 
   //serialization.cpp
   auto serialize(serializer&) -> void;
@@ -91,10 +94,22 @@ struct RDP : Thread, Memory::RCP<RDP> {
   struct Timing {
     //tunables
     bool   enable = true;
-    f64    contentionZ = 1.13;     //measured slowdown of read-modify-write spans (image read / depth) by the RDRAM traffic of a running game
-    f64    contentionPlain = 1.19; //the same for write-only spans (plain 1/2-cycle, fill, copy) and TMEM loads
-    f64    viFactor = 1.07;        //measured slowdown of read-modify-write spans with the VI scanning out a frame (write-only spans: none)
-    f64    spanPenalty = 40.0;     //measured extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (scattered primitives: 35-50, triangle strips: 13-26)
+    //the other bus masters are charged as they happen (timingDelay) instead of a fixed factor
+    f64    contentionZ = 1.0;      //scale on read-modify-write spans (image read / depth) beyond the per-transfer charges below
+    f64    contentionPlain = 1.0;  //the same for write-only spans (plain 1/2-cycle, fill, copy) and TMEM loads
+    //the VI's framebuffer fetch slows every RDRAM transfer; measured by replaying game display lists under
+    //every VI mode on an NTSC console (rdp_timing v12/v15): AA mode 3 (replicate, one line fetched per
+    //output line) +0.4%, mode 2 (resample) +3%, modes 0/1 (anti-aliased with divot: three lines per output
+    //line) +11.7% at 320x16-bit, +32% at 640x16-bit; mode 2 does not grow with the line (1280 pixels: +3%)
+    f64    viFactorAA3 = 1.004, viFactorAA2 = 1.03, viFactorAA0 = 1.117;
+    f64    viWidthScale = 1.77;    //AA 0/1: the factor over 1 grows by this per 640 bytes of line above 640: (1.324-1)/(1.117-1) = 1 + 1.77*(1280/640-1)
+    f64    viContendScale = 1.6;   //the per-transfer losses below grow with the VI factor: 1 + 0.117*1.6 at 320x16 AA0 (v12: x1.25 at +15.5%)
+    //RDP clocks lost to each transfer of another bus master while it has work in flight (rdp_timing v10, RDP drawing a game list):
+    f64    contendCpu = 11.7;      //a CPU data cache line fill (16 bytes)
+    f64    contendCpuI = 8.5;      //a CPU instruction cache line fill (32 bytes)
+    f64    contendCpuW = 5.0;      //a CPU data cache write-back (16 bytes)
+    f64    contendDma = 1.22;      //per 8 bytes of SP DMA (64 B: 10, 512 B: 77, 4 KiB: 656)
+    f64    spanPenalty = 15.0;     //extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (rdp_timing v9: the game lists need 15 on top of the stacked-primitive tables)
     f64    zPassFraction = 0.75;   //share of depth-tested pixels that pass (estimated from overdraw when zPassAuto)
     bool   zPassAuto = true;
     u64    frameZPixels;           //depth-tested pixels drawn since the last Sync_Full

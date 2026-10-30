@@ -53,8 +53,11 @@ auto RDP::timingReset() -> void {
   timing.enable = t.enable;
   timing.contentionZ = t.contentionZ;
   timing.contentionPlain = t.contentionPlain;
-  timing.viFactor = t.viFactor;
   timing.spanPenalty = t.spanPenalty;
+  timing.contendCpu = t.contendCpu; timing.contendCpuI = t.contendCpuI; timing.contendCpuW = t.contendCpuW;
+  timing.viFactorAA3 = t.viFactorAA3; timing.viFactorAA2 = t.viFactorAA2; timing.viFactorAA0 = t.viFactorAA0;
+  timing.viWidthScale = t.viWidthScale; timing.viContendScale = t.viContendScale;
+  timing.contendDma = t.contendDma;
   timing.zPassFraction = t.zPassFraction;
   timing.zPassAuto = t.zPassAuto;
   timing.colorSize = 2;
@@ -73,6 +76,18 @@ auto RDP::timingAdd(f64 cycles) -> void {
   timing.accumulated -= work;
   timing.submitted += work;
   timing.pending += work;
+}
+
+//another bus master held RDRAM for 'cycles' RDP clocks while the RDP had work in flight:
+//everything queued, including the Sync_Full interrupts already waiting, completes that much later
+auto RDP::timingDelay(f64 cycles) -> void {
+  if(!timing.enable || cycles <= 0.0 || timing.pending == 0 || command.freeze) return;
+  timing.accumulated += cycles * 3.0;
+  u64 work = (u64)timing.accumulated;
+  timing.accumulated -= work;
+  timing.submitted += work;
+  timing.pending += work;
+  for(u32 n : range(timing.syncQueued)) timing.syncTargets[n] += work;
 }
 
 //pick the table row for the current Set_Other_Modes / Set_Color_Image state
@@ -115,11 +130,24 @@ auto RDP::timingMode() -> u32 {
   return timing.mode = mode;
 }
 
+//how much the VI's framebuffer fetch slows the RDP in the current VI mode (see rdp.hpp)
+auto RDP::viModeFactor() -> f64 {
+  if(!vi.active()) return 1.0;
+  f64 f = vi.io.antialias == 3 ? timing.viFactorAA3 : vi.io.antialias == 2 ? timing.viFactorAA2 : timing.viFactorAA0;
+  u32 bytes = ((u32)vi.io.width ? (u32)vi.io.width : 320u) * (vi.io.colorDepth == 3 ? 4u : 2u);
+  if(bytes > 640 && vi.io.antialias < 2) f = 1.0 + (f - 1.0) * (1.0 + timing.viWidthScale * ((f64)bytes / 640.0 - 1.0));
+  return f;
+}
+
 //what a span or load costs in a running game relative to the idle-console tables
 auto RDP::timingScale(bool memoryBound) -> f64 {
   f64 f = memoryBound ? timing.contentionZ : timing.contentionPlain;
-  if(memoryBound && vi.active()) f *= timing.viFactor;
-  return f;
+  return f * viModeFactor();
+}
+
+//what a bus transfer of another master costs the RDP, scaled by the VI's own traffic (v12: x1.25 in the AA modes)
+auto RDP::contendScale() -> f64 {
+  return 1.0 + (viModeFactor() - 1.0) * timing.viContendScale;
 }
 
 //cost of one span of 'pixels' pixels whose first pixel is at (x, y) of the color image

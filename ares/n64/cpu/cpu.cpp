@@ -83,6 +83,7 @@ auto CPU::flushCount() -> void {
 auto CPU::synchronize() -> void {
   auto clocks = Thread::clock;
   auto counted = countClock;
+  clockEpoch += clocks;
   Thread::clock = 0;
   countClock = 0;
   jitClockTarget = 0;
@@ -192,13 +193,27 @@ auto CPU::icacheFillLine(u64 vaddr, u32 paddr) -> void {
   icache.line(vaddr).fill(paddr, *this);
 }
 
-auto CPU::rdpBusyStall(u32 cycles) -> u32 {
-  return rdp.timing.enable && rdp.timing.pending && !rdp.command.freeze ? cycles : 0;
+auto CPU::rdpBusyStall(u32 cycles, f64 rdpClocks) -> u32 {
+  u32 total = 0;
+  if(rdp.timing.enable && vi.active() && vi.io.antialias < 2) total += viStallCycles;  //the VI's three-line fetch
+  if(rdp.timing.enable && rdp.timing.pending && !rdp.command.freeze) {
+    rdp.timingDelay(rdpClocks * rdp.contendScale());  //and the RDP loses the bus for the transfer
+    total += cycles;
+  }
+  return total;
+}
+
+auto CPU::icacheBusyStall() -> u32 {
+  viStallCycles = ViStallIFill;
+  u32 r = rdpBusyStall(ICacheFillStall, rdp.timing.contendCpuI);
+  viStallCycles = ViStallFill;
+  return r;
 }
 
 //the recompiler's inline instruction cache fill: the stall part of the fill time
 auto CPU::icacheStall() -> void {
-  if(u32 cycles = rdpBusyStall(ICacheFillStall)) step(cycles * 2);
+  busWait();
+  if(u32 cycles = rdpBusyStall(ICacheFillStall, rdp.timing.contendCpuI)) step(cycles * 2);
 }
 
 template<bool Recompiled>

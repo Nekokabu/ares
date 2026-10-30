@@ -54,12 +54,27 @@ struct CPU : Thread {
   auto raiseCoprocessor1Exception() -> void;
   auto icacheFillLine(u64 vaddr, u32 paddr) -> void;
 
-  //cache line transfers wait for RDRAM behind the RDP while it is drawing (measured on
-  //hardware with rdp_timing v8: an instruction cache fill takes 10 CPU cycles longer, a
-  //data cache fill 4, a data cache write-back 12; otherwise the CPU is not slowed down)
-  auto rdpBusyStall(u32 cycles) -> u32;
+  //cache line transfers wait for RDRAM behind the RDP while it is drawing, and behind the VI's
+  //framebuffer fetch in the anti-aliased (divot/dedither) VI modes; measured on hardware with the
+  //rdp_timing test ROMs (v8/v10/v12): under a drawing RDP an instruction cache fill takes 6 CPU
+  //cycles longer, a data cache fill 5, a data cache write-back 11; in the games' VI mode another
+  //6/6/2. Each transfer in turn costs the RDP some clocks (rdp.timing.contendCpu*).
+  auto rdpBusyStall(u32 cycles, f64 rdpClocks) -> u32;
   auto icacheStall() -> void;
-  enum : u32 { ICacheFillStall = 10, DCacheFillStall = 4, DCacheWriteBackStall = 12 };
+  auto icacheBusyStall() -> u32;
+  enum : u32 { ICacheFillStall = 6, DCacheFillStall = 5, DCacheWriteBackStall = 11 };
+  enum : u32 { ICacheFillCycles = 48, DCacheFillCycles = 40, DCacheWriteBackCycles = 25 };  //cpu_timing v14: fill 41 incl. the load, write-back 25
+  enum : u32 { ViStallFill = 6, ViStallIFill = 6, ViStallWriteBack = 2 };
+  u32 viStallCycles = ViStallFill;  //the VI part of the stall for the transfer in progress
+  //a dirty line is filled first and written back from the write buffer afterwards; the CPU pays
+  //'WriteBufferCycles' and the next line transfer waits until the bus is free again (v14: a dirty
+  //miss costs 66 cycles against 41 for a clean one)
+  enum : u32 { WriteBufferCycles = 4 };
+  s64 clockEpoch = 0;          //Thread::clock is reset at every synchronize(); epoch + clock is monotonic
+  s64 busFreeAt = 0;
+  bool wbPending = false;
+  auto busNow() const -> s64 { return clockEpoch + Thread::clock; }
+  auto busWait() -> void { s64 now = busNow(); if(busFreeAt > now) step((u32)(busFreeAt - now)); }
 
   auto power(bool reset) -> void;
 
@@ -213,7 +228,8 @@ struct CPU : Thread {
       }
 
       auto fill(u32 paddr, CPU& cpu) -> void {
-        cpu.step((48 + cpu.rdpBusyStall(ICacheFillStall)) * 2);
+        cpu.busWait();
+        cpu.step((ICacheFillCycles + cpu.icacheBusyStall()) * 2);
         const u32 tag = paddr & ~0x0000'0fffu;
         tagKey = tag;
         setValid(true);
