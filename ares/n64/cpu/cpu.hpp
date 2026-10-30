@@ -75,6 +75,20 @@ struct CPU : Thread {
   bool wbPending = false;
   auto busNow() const -> s64 { return clockEpoch + Thread::clock; }
   auto busWait() -> void { s64 now = busNow(); if(busFreeAt > now) step((u32)(busFreeAt - now)); }
+  //an uncached RDRAM read stalls the pipeline for 32 cycles in all (cpu_timing v14; nemu64-test agrees)
+  enum : u32 { UncachedReadCycles = 31 };
+  //FPU costs measured with cpu_timing v11/v14: the FPU is pipelined. add/sub/mul (single and double)
+  //issue in 2 cycles and their result is ready 3 cycles after issue; conversions take 5; div.s and
+  //sqrt.s 29, the double forms 30; compares 1. 'issue' is what the instruction itself costs, the
+  //dependency stalls are scheduled per block by the recompiler (fpuLatency) and are not charged by
+  //the interpreter.
+  auto fpuCycles(u32 issue) const -> u32 { return (issue - 1) * 2; }
+  auto fpuLatency(u32 instruction) const -> u32;
+  //pipeline hazards measured with cpu_timing v11/v14: a load followed by an instruction that uses
+  //its result costs 1 more cycle, a store followed by another memory instruction 1 more, mfc0 of
+  //Count and mtc0 1 more; a likely branch that is not taken still spends the cycle of the
+  //nullified delay slot
+  auto hazardCycles(u32 instruction, u32 next) -> u32;
 
   auto power(bool reset) -> void;
 
@@ -95,7 +109,7 @@ struct CPU : Thread {
     auto branch(u64 address) -> void { nextpc = address; nstate |= DelaySlot | EndBlock; }
     auto noBranch() -> void { nstate |= DelaySlot; }
     auto exception() -> void { state |= EndBlock; }
-    auto skip() -> void { pc += 4; nextpc = pc + 4; state |= EndBlock; }
+    auto skip() -> void { pc += 4; nextpc = pc + 4; state |= EndBlock; self.step(1 * 2); }  //the nullified delay slot still spends its cycle
     auto begin() -> void {
       nstate = 0;
       pc = nextpc;

@@ -1,6 +1,6 @@
 template<typename T>
 struct RCP {  //A device which is part of RCP
-  const u32 DefaultReadCycles = 20;
+  const u32 DefaultReadCycles = 22;  //an RCP register read stalls the CPU for 23 cycles in all (cpu_timing v14; MI: 11)
   const u32 DefaultWriteCycles = 0;  //not implemented until we implement the CPU write queue
 
   template<u32 Size>

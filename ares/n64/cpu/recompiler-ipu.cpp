@@ -163,8 +163,7 @@ auto CPU::Recompiler::jitMemoryOpcode(u32 instruction, u32 size, u32 mode,
   cmp32(mem(reg(2), DcacheLineTagKeyOff), reg(3), set_z);
   auto cacheMiss = jump(flag_nz);
 
-  // Cache hit: account for the hit latency, then read/write the cached value.
-  emitCpuStep(2);
+  // Cache hit: a hit costs no extra cycle (cpu_timing v11); the load-use hazard is charged per block.
   if(system.homebrewMode) {
     add64(ProfileDcacheHitsMem, ProfileDcacheHitsMem, imm(1));
   }

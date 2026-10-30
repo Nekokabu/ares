@@ -170,6 +170,7 @@ auto CPU::read(PhysAccess access) -> maybe<u64> {
   u32 paddr = access.paddr;
   if(context.littleEndian()) paddr = reverseEndianPaddr<Size>(paddr);
   if(access.cache) return dcache.read<Size>(access.vaddr, paddr);
+  if(paddr < 0x03f0'0000) step(UncachedReadCycles * 2);  //RDRAM: the RCP devices charge their own cost
   return busRead<Size>(paddr);
 }
 

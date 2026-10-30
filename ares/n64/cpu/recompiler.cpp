@@ -680,6 +680,40 @@ auto CPU::Recompiler::emit(u64 vaddr, u32 address, u64 stateKey) -> Block* {
 
   // Phase 4: emit the planned instruction sequence.
   bool prevBranched = false;
+  // Static FPU scoreboard for this block: the FPU is pipelined (cpu_timing v11/v14), an instruction
+  // that reads a result before it is ready waits. The schedule starts afresh at every block entry.
+  std::vector<u32> fpuStall(plan.instructions.size(), 0);
+  {
+    s64 ready[32] = {}; s64 t = 0;
+    for(size_t i = 0; i < plan.instructions.size(); i++) {
+      u32 ins = plan.instructions[i].instruction;
+      u32 op = ins >> 26, fs = ins >> 11 & 31, ft = ins >> 16 & 31, fd = ins >> 6 & 31;
+      if(u32 lat = self.fpuLatency(ins)) {
+        u32 fn = ins & 0x3f;
+        s64 need = ready[fs];
+        if(fn <= 0x03 || fn >= 0x30) need = max(need, ready[ft]);
+        s64 stall = max<s64>(0, need - t);
+        fpuStall[i] = (u32)stall; t += stall;
+        u32 issue = lat <= 3 ? 2 : lat;   //add/sub/mul issue 2; conversions (5) and div/sqrt are not pipelined
+        if(fn < 0x30) ready[fd] = t + lat;
+        t += issue;
+      } else if(op == 0x31 || op == 0x35) {  //LWC1/LDC1
+        t += 1; ready[ft] = t + 1;
+      } else if(op == 0x39 || op == 0x3d) {  //SWC1/SDC1
+        s64 stall = max<s64>(0, ready[ft] - t);
+        fpuStall[i] = (u32)stall; t += stall + 1;
+      } else if(op == 0x11 && (ins >> 21 & 31) <= 1) {  //MFC1/DMFC1
+        s64 stall = max<s64>(0, ready[fs] - t);
+        fpuStall[i] = (u32)stall; t += stall + 1;
+      } else if(op == 0x11 && ((ins >> 21 & 31) == 4 || (ins >> 21 & 31) == 5)) {  //MTC1/DMTC1
+        t += 1; ready[fs] = t;
+      } else {
+        u32 next = i + 1 < plan.instructions.size() ? plan.instructions[i + 1].instruction : 0;
+        t += 1 + self.hazardCycles(ins, next);
+      }
+    }
+  }
+
   for(size_t idx = 0; idx < plan.instructions.size(); idx++) {
     auto& ii = plan.instructions[idx];
     bool firstInstruction = (idx == 0);
@@ -747,6 +781,18 @@ auto CPU::Recompiler::emit(u64 vaddr, u32 address, u64 stateKey) -> Block* {
       instructionCycles = 64 * 2;
     }
     emitDeferredCycles += instructionCycles;
+    {
+      // Pipeline hazards against the next instruction and the FPU dependency stalls.
+      u32 nextInstruction = idx + 1 < plan.instructions.size() ? plan.instructions[idx + 1].instruction : 0;
+      emitDeferredCycles += self.hazardCycles(instruction, nextInstruction) * 2;
+      emitDeferredCycles += fpuStall[idx] * 2;
+      if(info.likelyBranch()) {  //a nullified delay slot still costs its cycle: state has EndBlock set only when not taken
+        mov32(reg(0), PipelineReg(state));
+        and32(reg(0), reg(0), imm(Pipeline::EndBlock));
+        shl64(reg(0), reg(0), imm(1));
+        add64(CpuClockMem, CpuClockMem, reg(0));
+      }
+    }
     // Synchronize cycles before any branch/helper boundary.
     if(delaySlot || info.branch() || emitCallfEmitted) flushDeferredCycles();
 
@@ -773,8 +819,13 @@ auto CPU::Recompiler::emit(u64 vaddr, u32 address, u64 stateKey) -> Block* {
 
     if(slowPaths.size() != slowPathStart) {
       // New slow paths created by this opcode resume right after it.
+      // The slow path charges the cycles deferred up to here itself, so settle them on the fast path before the
+      // resume label: otherwise an instruction that took the slow path was charged twice (uncached loads and
+      // cache misses cost one cycle more in the recompiler than in the interpreter).
+      u32 deferredAtResume = emitDeferredCycles;
+      flushDeferredCycles();
       auto resume = sljit_emit_label(compiler);
-      bindSlowPaths(slowPathStart, resume, emitDeferredCycles, !delaySlot);
+      bindSlowPaths(slowPathStart, resume, deferredAtResume, !delaySlot);
     }
 
     bool prevIsConditionalBranch = delaySlot && idx > 0

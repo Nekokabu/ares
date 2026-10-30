@@ -467,7 +467,7 @@ auto CPU::FADD_S(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f32, ffd, FS(f32) + FT(f32));
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((3 - 1) * 2);
+  step(fpuCycles(2));
 }
 
 auto CPU::FADD_D(u8 fd, u8 fs, u8 ft) -> void {
@@ -477,7 +477,7 @@ auto CPU::FADD_D(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f64, ffd, ffs + fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((3 - 1) * 2);
+  step(fpuCycles(2));
 }
 
 auto CPU::FCEIL_L_S(u8 fd, u8 fs) -> void {
@@ -486,7 +486,7 @@ auto CPU::FCEIL_L_S(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s64>(ffs)) return;
   CHECK_FPE(s64, ffd, roundCeil<s64>(ffs));
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCEIL_L_D(u8 fd, u8 fs) -> void {
@@ -495,7 +495,7 @@ auto CPU::FCEIL_L_D(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s64>(ffs)) return;
   CHECK_FPE(s64, ffd, roundCeil<s64>(ffs));
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCEIL_W_S(u8 fd, u8 fs) -> void {
@@ -504,7 +504,7 @@ auto CPU::FCEIL_W_S(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s32>(ffs)) return;
   CHECK_FPE_CONV(s32, ffd, roundCeil<s32>(ffs));
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCEIL_W_D(u8 fd, u8 fs) -> void {
@@ -513,7 +513,7 @@ auto CPU::FCEIL_W_D(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s32>(ffs)) return;
   CHECK_FPE_CONV(s32, ffd, roundCeil<s32>(ffs));
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 #define  XORDERED(type, value, quiet) \
@@ -712,7 +712,7 @@ auto CPU::FCVT_S_W(u8 fd, u8 fs) -> void {
   CHECK_FPE(f32, ffd, ffs);
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_S_L(u8 fd, u8 fs) -> void {
@@ -725,7 +725,7 @@ auto CPU::FCVT_S_L(u8 fd, u8 fs) -> void {
   CHECK_FPE(f32, ffd, (f32)ffs);
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_D_S(u8 fd, u8 fs) -> void {
@@ -748,7 +748,7 @@ auto CPU::FCVT_D_W(u8 fd, u8 fs) -> void {
   CHECK_FPE(f64, ffd, (f64)ffs);
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_D_L(u8 fd, u8 fs) -> void {
@@ -761,7 +761,7 @@ auto CPU::FCVT_D_L(u8 fd, u8 fs) -> void {
   CHECK_FPE(f64, ffd, (f64)ffs);
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_L_S(u8 fd, u8 fs) -> void {
@@ -770,7 +770,7 @@ auto CPU::FCVT_L_S(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s64>(ffs)) return;
   CHECK_FPE(s64, ffd, roundCurrent<s64>(ffs));
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_L_D(u8 fd, u8 fs) -> void {
@@ -779,7 +779,7 @@ auto CPU::FCVT_L_D(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s64>(ffs)) return;
   CHECK_FPE(s64, ffd, roundCurrent<s64>(ffs));
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_W_S(u8 fd, u8 fs) -> void {
@@ -788,7 +788,7 @@ auto CPU::FCVT_W_S(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s32>(ffs)) return;
   CHECK_FPE_CONV(s32, ffd, roundCurrent<s32>(ffs));
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FCVT_W_D(u8 fd, u8 fs) -> void {
@@ -797,7 +797,7 @@ auto CPU::FCVT_W_D(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s32>(ffs)) return;
   CHECK_FPE_CONV(s32, ffd, roundCurrent<s32>(ffs));
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FDIV_S(u8 fd, u8 fs, u8 ft) -> void {
@@ -807,7 +807,7 @@ auto CPU::FDIV_S(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f32, ffd, ffs / fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((29 - 1) * 2);
+  step(fpuCycles(29));
 }
 
 auto CPU::FDIV_D(u8 fd, u8 fs, u8 ft) -> void {
@@ -817,7 +817,7 @@ auto CPU::FDIV_D(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f64, ffd, ffs / fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((58 - 1) * 2);
+  step(fpuCycles(30));
 }
 
 auto CPU::FFLOOR_L_S(u8 fd, u8 fs) -> void {
@@ -826,7 +826,7 @@ auto CPU::FFLOOR_L_S(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s64>(ffs)) return;
   CHECK_FPE(s64, ffd, roundFloor<s64>(ffs));
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FFLOOR_L_D(u8 fd, u8 fs) -> void {
@@ -835,7 +835,7 @@ auto CPU::FFLOOR_L_D(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s64>(ffs)) return;
   CHECK_FPE(s64, ffd, roundFloor<s64>(ffs));
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FFLOOR_W_S(u8 fd, u8 fs) -> void {
@@ -844,7 +844,7 @@ auto CPU::FFLOOR_W_S(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s32>(ffs)) return;
   CHECK_FPE_CONV(s32, ffd, roundFloor<s32>(ffs));
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FFLOOR_W_D(u8 fd, u8 fs) -> void {
@@ -853,7 +853,7 @@ auto CPU::FFLOOR_W_D(u8 fd, u8 fs) -> void {
   if(!fpuCheckInputConv<s32>(ffs)) return;
   CHECK_FPE_CONV(s32, ffd, roundFloor<s32>(ffs));
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FMOV_S(u8 fd, u8 fs) -> void {
@@ -872,7 +872,7 @@ auto CPU::FMUL_S(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f32, ffd, ffs * fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(2));
 }
 
 auto CPU::FMUL_D(u8 fd, u8 fs, u8 ft) -> void {
@@ -882,7 +882,7 @@ auto CPU::FMUL_D(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f64, ffd, ffs * fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((8 - 1) * 2);
+  step(fpuCycles(2));
 }
 
 auto CPU::FNEG_S(u8 fd, u8 fs) -> void {
@@ -910,7 +910,7 @@ auto CPU::FROUND_L_S(u8 fd, u8 fs) -> void {
   CHECK_FPE(s64, ffd, roundNearest<s64>(ffs));
   if(ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FROUND_L_D(u8 fd, u8 fs) -> void {
@@ -920,7 +920,7 @@ auto CPU::FROUND_L_D(u8 fd, u8 fs) -> void {
   CHECK_FPE(s64, ffd, roundNearest<s64>(ffs));
   if(ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FROUND_W_S(u8 fd, u8 fs) -> void {
@@ -930,7 +930,7 @@ auto CPU::FROUND_W_S(u8 fd, u8 fs) -> void {
   CHECK_FPE_CONV(s32, ffd, roundNearest<s32>(ffs));
   if(ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FROUND_W_D(u8 fd, u8 fs) -> void {
@@ -940,7 +940,7 @@ auto CPU::FROUND_W_D(u8 fd, u8 fs) -> void {
   CHECK_FPE_CONV(s32, ffd, roundNearest<s32>(ffs));
   if(ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FSQRT_S(u8 fd, u8 fs) -> void {
@@ -950,7 +950,7 @@ auto CPU::FSQRT_S(u8 fd, u8 fs) -> void {
   CHECK_FPE(f32, ffd, squareRoot(ffs));
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((29 - 1) * 2);
+  step(fpuCycles(29));
 }
 
 auto CPU::FSQRT_D(u8 fd, u8 fs) -> void {
@@ -960,7 +960,7 @@ auto CPU::FSQRT_D(u8 fd, u8 fs) -> void {
   CHECK_FPE(f64, ffd, squareRoot(ffs));
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((58 - 1) * 2);
+  step(fpuCycles(30));
 }
 
 auto CPU::FSUB_S(u8 fd, u8 fs, u8 ft) -> void {
@@ -970,7 +970,7 @@ auto CPU::FSUB_S(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f32, ffd, ffs - fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f32) = ffd;
-  step((3 - 1) * 2);
+  step(fpuCycles(2));
 }
 
 auto CPU::FSUB_D(u8 fd, u8 fs, u8 ft) -> void {
@@ -980,7 +980,7 @@ auto CPU::FSUB_D(u8 fd, u8 fs, u8 ft) -> void {
   CHECK_FPE(f64, ffd, ffs - fft);
   if(!fpuCheckOutput(ffd)) return;
   FD(f64) = ffd;
-  step((3 - 1) * 2);
+  step(fpuCycles(2));
 }
 
 auto CPU::FTRUNC_L_S(u8 fd, u8 fs) -> void {
@@ -990,7 +990,7 @@ auto CPU::FTRUNC_L_S(u8 fd, u8 fs) -> void {
   CHECK_FPE(s64, ffd, roundTrunc<s64>(ffs));
   if((f32)ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FTRUNC_L_D(u8 fd, u8 fs) -> void {
@@ -1000,7 +1000,7 @@ auto CPU::FTRUNC_L_D(u8 fd, u8 fs) -> void {
   CHECK_FPE(s64, ffd, roundTrunc<s64>(ffs));
   if((f64)ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s64) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FTRUNC_W_S(u8 fd, u8 fs) -> void {
@@ -1010,7 +1010,7 @@ auto CPU::FTRUNC_W_S(u8 fd, u8 fs) -> void {
   CHECK_FPE_CONV(s32, ffd, roundTrunc<s32>(ffs));
   if((f32)ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::FTRUNC_W_D(u8 fd, u8 fs) -> void {
@@ -1020,7 +1020,7 @@ auto CPU::FTRUNC_W_D(u8 fd, u8 fs) -> void {
   CHECK_FPE_CONV(s32, ffd, roundTrunc<s32>(ffs));
   if((f64)ffd != ffs && fpeInexact()) return exception.floatingPoint();
   FD(s32) = ffd;
-  step((5 - 1) * 2);
+  step(fpuCycles(5));
 }
 
 auto CPU::LDC1(u8 ft, cr64& rs, s16 imm) -> void {

@@ -203,6 +203,50 @@ auto CPU::rdpBusyStall(u32 cycles, f64 rdpClocks) -> u32 {
   return total;
 }
 
+//result latency of a COP1 arithmetic instruction in cycles (cpu_timing v11/v14); 0 = not one
+auto CPU::fpuLatency(u32 instruction) const -> u32 {
+  if((instruction >> 26) != 0x11 || !(instruction >> 25 & 1)) return 0;
+  u32 fmt = instruction >> 21 & 31, fn = instruction & 0x3f;
+  bool dbl = fmt == 17 || fmt == 21;
+  switch(fn) {
+  case 0x00: case 0x01: case 0x02: return 3;          //add, sub, mul
+  case 0x03: return dbl ? 30 : 29;                    //div (div.s measured 28-29; div.d assumed like sqrt.d)
+  case 0x04: return dbl ? 30 : 29;                    //sqrt (measured 28-29 and 30)
+  case 0x05: case 0x06: case 0x07: return 1;          //abs, mov, neg
+  case 0x08: case 0x09: case 0x0a: case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f: return 5;  //round/trunc/ceil/floor
+  case 0x20: case 0x21: case 0x24: case 0x25: return 5;  //cvt
+  default: return fn >= 0x30 ? 1 : 0;                 //compares
+  }
+}
+
+//pipeline hazards (cycles) between an instruction and the one that follows it in memory
+auto CPU::hazardCycles(u32 instruction, u32 next) -> u32 {
+  auto op = instruction >> 26;
+  auto isLoad = [](u32 o) { return (o >= 0x20 && o <= 0x27) || o == 0x37 || o == 0x1a || o == 0x1b || o == 0x30 || o == 0x34 || o == 0x31 || o == 0x35; };
+  auto isStore = [](u32 o) { return (o >= 0x28 && o <= 0x2f) || o == 0x38 || o == 0x3c || o == 0x39 || o == 0x3d; };
+  u32 cycles = 0;
+  if(op == 0x10 && (instruction >> 21 & 31) <= 1 && (instruction >> 11 & 31) == 9) cycles += 1;  //MFC0 Count costs 2 (Status: 1)
+  if(op == 0x10 && ((instruction >> 21 & 31) == 4 || (instruction >> 21 & 31) == 5)) cycles += 1;  //MTC0/DMTC0 cost 2
+  if(!next) return cycles;
+  auto nop = next >> 26;
+  if(isStore(op) && (isLoad(nop) || isStore(nop) || nop == 0x2f)) return cycles + 1;  //the store occupies the data cache for one more cycle
+  if(!isLoad(op)) return cycles;
+  if(op == 0x31 || op == 0x35) return cycles;  //LWC1/LDC1: handled by the FPU scoreboard
+  u32 rt = instruction >> 16 & 31;
+  if(rt == 0) return cycles;
+  u32 nrs = next >> 21 & 31, nrt = next >> 16 & 31;
+  bool readsRs = !(nop == 0x02 || nop == 0x03 || nop == 0x0f || nop == 0x10 || nop == 0x11 || nop == 0x12);
+  bool readsRt = nop == 0x00 || isStore(nop) || (nop == 0x10 && (nrs == 4 || nrs == 5)) || (nop == 0x11 && (nrs == 4 || nrs == 5 || nrs == 6));
+  if(nop == 0x00) {  //SPECIAL: JR/JALR and SLL/SRL/SRA (rs field is the shift amount) read differently
+    u32 fn = next & 0x3f;
+    if(fn == 0x08 || fn == 0x09) return cycles;  //measured: lw ra; jr ra costs nothing extra
+    if(fn <= 0x03) readsRs = false;
+  }
+  if(nop == 0x01 || nop == 0x04 || nop == 0x05 || nop == 0x14 || nop == 0x15 || nop == 0x06 || nop == 0x07 || nop == 0x16 || nop == 0x17) return cycles;  //branches
+  if((readsRs && nrs == rt) || (readsRt && nrt == rt)) cycles += 1;
+  return cycles;
+}
+
 auto CPU::icacheBusyStall() -> u32 {
   viStallCycles = ViStallIFill;
   u32 r = rdpBusyStall(ICacheFillStall, rdp.timing.contendCpuI);
