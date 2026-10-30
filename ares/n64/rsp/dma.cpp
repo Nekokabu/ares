@@ -17,7 +17,8 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
     dma.current = dma.pending;
     dma.busy    = dma.full;
     dma.full    = {0,0};
-    dmaQueue((dma.current.length+8) / 8 * 3, thread);
+    dmaQueue((dma.current.length+8) / 8 * DmaClocksPer8Bytes + DmaClocksPerTransfer, thread);
+    rdp.timingDelay((dma.current.length+8) / 8 * rdp.timing.contendDma);  //the RDP loses the bus meanwhile
   }
 }
 
@@ -64,7 +65,8 @@ auto RSP::dmaTransferStep() -> void {
   if(dma.current.count) {
     dma.current.count -= 1;
     dma.current.dramAddress += dma.current.skip;
-    dmaQueue((dma.current.length+8) / 8 * 3, *this);
+    dmaQueue((dma.current.length+8) / 8 * DmaClocksPer8Bytes, *this);
+    rdp.timingDelay((dma.current.length+8) / 8 * rdp.timing.contendDma);
   } else {
     dma.busy = {0,0};
     dma.current.length = 0xFF8;

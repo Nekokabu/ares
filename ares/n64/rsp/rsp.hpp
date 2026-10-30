@@ -261,6 +261,9 @@ struct RSP : Thread, Memory::RCP<RSP> {
   } pipeline;
 
   //dma.cpp
+  //an SP DMA takes 38 RSP cycles plus 0.155 per byte on hardware (rsp_timing v16: 8 B 38, 64 B 44,
+  //256 B 70, 1 KiB 186, 3.5 KiB 588; writes to RDRAM 32 + 0.145/B), in system clocks (3 per RSP cycle):
+  enum : u32 { DmaClocksPer8Bytes = 4, DmaClocksPerTransfer = 114 };
   auto dmaQueue(u32 clocks, Thread& thread) -> void;
   auto dmaStep(u32 clocks) -> void;
   auto dmaTransferStart(Thread& thread) -> void;
