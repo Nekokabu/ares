@@ -44,6 +44,7 @@ auto RDP::serialize(serializer& s) -> void {
   s(timing.syncTargets);
   s(timing.framePixels);
   s(timing.frameCycles);
+  if(s.reading()) timing.rangeHead = timing.rangeCount = 0;  //the fetch-pointer ranges are not saved: DPC_CURRENT reads as DPC_END until the next DPC_END write
 
   s(edge.lmajor);
   s(edge.level);

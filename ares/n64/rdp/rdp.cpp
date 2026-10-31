@@ -28,6 +28,7 @@ auto RDP::crash(const char *reason) -> void {
   command.bufferBusy = 1;
   timing.pending = 0;
   timing.syncQueued = 0;
+  timing.rangeCount = 0;
 }
 
 auto RDP::main() -> void {

@@ -15,8 +15,20 @@ auto RDP::readWord(u32 address, Thread& thread) -> u32 {
   }
 
   if(address == 2) {
-    //DPC_CURRENT
+    //DPC_CURRENT: where the RDP has got to in the ranges it was given (see Timing::ranges)
     data.bit(0,23) = command.current;
+    if(timing.enable && timing.pending) {
+      auto& t = timing;
+      while(t.rangeCount > 1 && t.ranges[t.rangeHead].after <= t.completed) { t.rangeHead = (t.rangeHead + 1) & 2047; t.rangeCount--; }
+      if(t.rangeCount) {
+        auto& r = t.ranges[t.rangeHead];
+        u64 done = t.completed > r.before ? t.completed - r.before : 0;
+        u64 span = r.after > r.before ? r.after - r.before : 1;
+        if(done > span) done = span;
+        u32 bytes = r.end >= r.start ? r.end - r.start : 0;
+        data.bit(0,23) = (r.start + (u32)((u64)bytes * done / span)) & ~7;
+      }
+    }
     if(&thread == &cpu) cpu.forceSynchronize();
   }
 
@@ -82,7 +94,14 @@ auto RDP::writeWord(u32 address, u32 data_, Thread& thread) -> void {
       command.current = command.start;
       command.startValid = 0;
     }
+    Timing::Range range{command.current, command.end, timing.submitted, 0};
     flushCommands();
+    range.after = timing.submitted;
+    if(timing.enable && range.after > range.before) {
+      auto& t = timing;
+      if(t.rangeCount == 2048) { t.rangeHead = (t.rangeHead + 1) & 2047; t.rangeCount--; }
+      t.ranges[(t.rangeHead + t.rangeCount) & 2047] = range; t.rangeCount++;
+    }
     if(&thread == &cpu) cpu.forceSynchronize();
   }
 

@@ -144,6 +144,19 @@ struct RDP : Thread, Memory::RCP<RDP> {
     u64    framePixels;
     u64    frameCycles;
     u64    syncFullCount;         //total Sync_Full commands seen (statistics)
+
+    //The command fetch pointer. The renderer consumes a DPC_START..DPC_END range the moment DPC_END is
+    //written, but the real RDP only gets through it as fast as it draws, and the microcode reads
+    //DPC_CURRENT to know how far: F3DEX2 writes its commands into a small RDRAM FIFO (8 KiB in Beetle
+    //Adventure Racing) and waits whenever the next flush would overwrite what the RDP has not fetched
+    //yet, and at the end of the FIFO waits for DPC_CURRENT == DPC_END before wrapping. With the pointer
+    //at the end the RSP finished a frame's task in 0.5 VI while the RDP drew for 1.5 VI; on the console
+    //the task ends 0.05-0.3 VI before the RDP does (task_timing v20). So each DPC_END write records the
+    //range and the work it queued, and DPC_CURRENT is read as the point of the oldest unfinished range
+    //that the completed work has reached.
+    struct Range { u32 start, end; u64 before, after; };
+    Range  ranges[2048];
+    u32    rangeHead, rangeCount;
   } timing;
 
   struct Command {
