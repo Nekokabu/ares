@@ -103,14 +103,19 @@ struct RDP : Thread, Memory::RCP<RDP> {
     //line) +11.7% at 320x16-bit, +32% at 640x16-bit; mode 2 does not grow with the line (1280 pixels: +3%)
     f64    viFactorAA3 = 1.004, viFactorAA2 = 1.03, viFactorAA0 = 1.117;
     f64    viWidthScale = 1.77;    //AA 0/1: the factor over 1 grows by this per 640 bytes of line above 640: (1.324-1)/(1.117-1) = 1 + 1.77*(1280/640-1)
-    f64    viContendScale = 1.6;   //the per-transfer losses below grow with the VI factor: 1 + 0.117*1.6 at 320x16 AA0 (v12: x1.25 at +15.5%)
+    f64    viContendScale = 2.4;   //the per-transfer losses below grow with the VI factor: 1 + 0.117*2.4 at 320x16 AA0 (task_timing v20b: a
+                                   //CPU line fill costs the RDP 10.4 clocks with the VI off and 13.3 in the game's VI mode; v12 x1.25, v17 x1.42)
     //RDP clocks lost to each transfer of another bus master while it has work in flight (rdp_timing v10, RDP drawing a game list):
-    f64    contendCpu = 11.7;      //a CPU data cache line fill (16 bytes)
+    f64    contendCpu = 10.0;      //a CPU data cache line fill (16 bytes): 10.4 with the VI off under a real task (task_timing v20b), 9.7 (v17), 11.7 (v10)
     f64    contendCpuI = 8.5;      //a CPU instruction cache line fill (32 bytes)
     f64    contendCpuW = 1.0;      //a CPU data cache write-back (16 bytes; rdp_timing v17: a random load+store loop costs the RDP about two fills' worth, not two fills and two write-backs)
     f64    contendCpuU = 4.0;      //an uncached CPU write (rdp_timing v17: 2.7 with the VI off, 5 in the games' VI mode)
     f64    contendDma = 1.2;       //per 8 bytes of SP DMA, plus contendDmaBase per transfer: the RDP only gets about 36 clocks of
-    f64    contendDmaBase = 6.0;   //bus between two back-to-back DMAs whatever their size (rsp_timing v19b: 8 B 6, 64 B 10, 512 B 76, 3.5 KiB 549)
+                                   //bus between two back-to-back DMAs whatever their size (rsp_timing v19b: 8 B 6, 64 B 10, 512 B 76, 3.5 KiB 549)
+    f64    contendDmaBase = 9.0;   //an isolated transfer costs a few clocks more than a back-to-back one: F3DEX2's 1164 DMAs per frame
+                                   //(168 B list fetches, 344 B output flushes, vertex and matrix loads) cost the RDP 51 clocks each with the VI
+                                   //off (task_timing v20b: 0.057 VI per frame; the v19b rule gives 45, this 48) and 47-71 in the game's VI mode
+                                   //depending on the console (PAL/NTSC); the contendScale factor (x1.28) sits between the two
     f64    spanPenalty = 15.0;     //extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (rdp_timing v9: the game lists need 15 on top of the stacked-primitive tables)
     f64    zPassFraction = 0.75;   //share of depth-tested pixels that pass (estimated from overdraw when zPassAuto)
     bool   zPassAuto = true;

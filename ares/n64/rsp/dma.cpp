@@ -19,7 +19,7 @@ auto RSP::dmaTransferStart(Thread& thread) -> void {
     dma.busy    = dma.full;
     dma.full    = {0,0};
     dmaQueue(dmaClocks(dma.current.length) + DmaClocksPerTransfer, thread);
-    rdp.timingDelay(rdp.timing.contendDmaBase + (dma.current.length+8) / 8 * rdp.timing.contendDma);  //the RDP loses the bus meanwhile
+    rdp.timingDelay((rdp.timing.contendDmaBase + (dma.current.length+8) / 8 * rdp.timing.contendDma) * rdp.contendScale());  //the RDP loses the bus meanwhile
   }
 }
 
@@ -67,7 +67,7 @@ auto RSP::dmaTransferStep() -> void {
     dma.current.count -= 1;
     dma.current.dramAddress += dma.current.skip;
     dmaQueue(dmaClocks(dma.current.length), *this);
-    rdp.timingDelay(rdp.timing.contendDmaBase + (dma.current.length+8) / 8 * rdp.timing.contendDma);
+    rdp.timingDelay((rdp.timing.contendDmaBase + (dma.current.length+8) / 8 * rdp.timing.contendDma) * rdp.contendScale());
   } else {
     dma.busy = {0,0};
     dma.current.length = 0xFF8;
