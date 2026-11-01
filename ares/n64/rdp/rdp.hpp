@@ -119,6 +119,11 @@ struct RDP : Thread, Memory::RCP<RDP> {
     f64    spanPenalty = 15.0;     //extra clocks per read-modify-write span of a primitive placed anywhere but right after the previous one (rdp_timing v9: the game lists need 15 on top of the stacked-primitive tables)
     f64    zPassFraction = 0.75;   //share of depth-tested pixels that pass (estimated from overdraw when zPassAuto)
     bool   zPassAuto = true;
+    u32    zFailWidth = 16;        //spans up to this many pixels can fail the depth test as a whole; wider spans always pay the passing cost (rdp_timing v24/v28)
+    f64    atomicCost = 20.0;      //clocks per primitive with ATOMIC_PRIM set (rdp_timing v24/v25)
+    f64    aaSpanCost = 3.5;       //clocks per span of an anti-aliased 1-cycle primitive (rdp_timing v24)
+    n1     atomicPrim;             //Set_Other_Modes bits the model needs beyond the cycle type and depth/image read
+    n1     antialias;
     u64    frameZPixels;           //depth-tested pixels drawn since the last Sync_Full
 
     //state decoded from the command stream (only what the model needs)

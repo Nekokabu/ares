@@ -59,7 +59,8 @@ auto RDP::timingReset() -> void {
   timing.viWidthScale = t.viWidthScale; timing.viContendScale = t.viContendScale;
   timing.contendDma = t.contendDma; timing.contendDmaBase = t.contendDmaBase;
   timing.zPassFraction = t.zPassFraction;
-  timing.zPassAuto = t.zPassAuto;
+  timing.zPassAuto = t.zPassAuto; timing.zFailWidth = t.zFailWidth;
+  timing.atomicCost = t.atomicCost; timing.aaSpanCost = t.aaSpanCost;
   timing.colorSize = 2;
   timing.colorWidth = 319;
   timing.textureSize = 2;
@@ -181,7 +182,13 @@ auto RDP::timingSpan(s32 x, s32 y, u32 pixels) -> f64 {
     f64 fail = rdp_tm_span(zfail, address, w);
     timing.frameZPixels += pixels;
     if(both) {
-      cost += (fail - pass) * (1.0 - timing.zPassFraction);
+      //a span whose pixels all fail the depth test is 15-40 clocks cheaper (no writes), but a span
+      //with even one passing pixel costs the full read-modify-write: the games' frames replayed with
+      //the depth buffer preset so that only their own overdraw fails cost exactly what the real frames
+      //cost (rdp_timing v24), so partial occlusion saves nothing. Only short spans are hidden as a
+      //whole (Donkey Kong 64's small triangles: -17% on the console, v28), so the estimated pass rate
+      //is applied to spans up to zFailWidth pixels and wider spans always pay the passing cost.
+      if(w <= (s32)timing.zFailWidth) cost += (fail - pass) * (1.0 - timing.zPassFraction);
     } else {
       auto partial = timing.zCompare ? RDP_TM_1CYC16_ZCMP : RDP_TM_1CYC16_ZUPD;
       f64 ref = rdp_tm_span(RDP_TM_1CYC16_ZPASS, address, w);
@@ -222,7 +229,7 @@ auto RDP::timingTriangle(const u64* ops, bool shade, bool texture, bool zbuffer)
   if(rowEnd - rowStart > 1024) rowEnd = rowStart + 1024;  //guard against garbage
 
   f64 cycles = 0.0;
-  u32 widest = 0;
+  u32 widest = 0, spans = 0;
   for(s32 row = rowStart; row < rowEnd; row++) {
     f64 yc = row + 0.5;
     if(yc < fyh || yc >= fyl) continue;
@@ -236,11 +243,17 @@ auto RDP::timingTriangle(const u64* ops, bool shade, bool texture, bool zbuffer)
     u32 pixels = (u32)(x1 - x0 + 0.5);
     if(pixels == 0) pixels = 1;
     if(pixels > widest) widest = pixels;
+    spans++;
     cycles += timingSpan((s32)floor(x0), row, pixels);
   }
   //per-primitive overhead (can be slightly negative: setup overlaps the previous primitive)
   cycles += rdp_tm_prim_overhead((enum rdp_tm_mode)timing.mode, widest ? widest : 1);
   if(shade || texture) cycles += 3.0;
+  //ATOMIC_PRIM serialises the primitives: 20 clocks each (Donkey Kong 64 sets it; rdp_timing v24/v25:
+  //-3.3% / -1.5..1.9% of its frames with the bit cleared). Anti-aliasing costs about 3.5 clocks per
+  //span in 1-cycle mode (DK64 -3.2%) and nothing in 2-cycle mode (Beetle Adventure Racing: 0).
+  if(timing.atomicPrim) cycles += timing.atomicCost;
+  if(timing.antialias && timing.cycleType == 0) cycles += timing.aaSpanCost * (f64)spans;
   timingAdd(cycles);
 }
 
@@ -367,6 +380,8 @@ auto RDP::timingCommand(const u64* ops, u32 length) -> void {
     timing.imageRead = n1(op >>  6);
     timing.zUpdate   = n1(op >>  5);
     timing.zCompare  = n1(op >>  4);
+    timing.atomicPrim = n1(op >> 55);
+    timing.antialias  = n1(op >>  3);
     timingMode();
     timingAdd(state);
   } break;

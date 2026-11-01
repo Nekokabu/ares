@@ -37,6 +37,8 @@ auto RDP::serialize(serializer& s) -> void {
   s(timing.accumulated);
   s(timing.zPassFraction);
   s(timing.frameZPixels);
+  s(timing.atomicPrim);
+  s(timing.antialias);
   s(timing.submitted);
   s(timing.completed);
   s(timing.pending);
