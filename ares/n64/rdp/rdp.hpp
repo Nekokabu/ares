@@ -121,7 +121,12 @@ struct RDP : Thread, Memory::RCP<RDP> {
     bool   zPassAuto = true;
     u32    zFailWidth = 16;        //spans up to this many pixels can fail the depth test as a whole; wider spans always pay the passing cost (rdp_timing v24/v28)
     f64    atomicCost = 20.0;      //clocks per primitive with ATOMIC_PRIM set (rdp_timing v24/v25)
-    f64    aaSpanCost = 3.5;       //clocks per span of an anti-aliased 1-cycle primitive (rdp_timing v24)
+    f64    aaSpanCost = 3.5;
+    f64    writeOnlySpan = 1.2;      //extra clocks per write-only span (no image read, no depth), 320-pixel-wide colour image (rdp_timing v31/v32)
+    f64    writeOnlySpanWide = 2.8;  //the same for a colour image wider than 320 pixels (the MGC 2011 demo's 640x480)
+    f64    writeOnlyTri = 5.0;       //extra clocks per write-only triangle: edges (+5), shade words (+7), texture words (+30)
+    f64    writeOnlyShade = 7.0;
+    f64    writeOnlyTexture = 30.0;       //clocks per span of an anti-aliased 1-cycle primitive (rdp_timing v24)
     n1     atomicPrim;             //Set_Other_Modes bits the model needs beyond the cycle type and depth/image read
     n1     antialias;
     u64    frameZPixels;           //depth-tested pixels drawn since the last Sync_Full

@@ -61,6 +61,8 @@ auto RDP::timingReset() -> void {
   timing.zPassFraction = t.zPassFraction;
   timing.zPassAuto = t.zPassAuto; timing.zFailWidth = t.zFailWidth;
   timing.atomicCost = t.atomicCost; timing.aaSpanCost = t.aaSpanCost;
+  timing.writeOnlySpan = t.writeOnlySpan; timing.writeOnlySpanWide = t.writeOnlySpanWide;
+  timing.writeOnlyTri = t.writeOnlyTri; timing.writeOnlyShade = t.writeOnlyShade; timing.writeOnlyTexture = t.writeOnlyTexture;
   timing.colorSize = 2;
   timing.colorWidth = 319;
   timing.textureSize = 2;
@@ -202,6 +204,12 @@ auto RDP::timingSpan(s32 x, s32 y, u32 pixels) -> f64 {
   if(cost < pipe) cost = pipe;
   cost *= timingScale(timing.memoryBound);
   if(timing.memoryBound) cost += timing.spanPenalty;
+  else if(timing.cycleType < 2) {
+    //write-only 1/2-cycle spans (no image read, no depth) cost a little more than the tables on the
+    //console: +1.2 clocks per span into a 320-pixel-wide colour image and +2.8 into a 640-pixel-wide
+    //one (rdp_timing v31/v32: the MGC 2011 demo's 640x480 parts)
+    cost += stride > 640 ? timing.writeOnlySpanWide : timing.writeOnlySpan;
+  }
 
   timing.framePixels += pixels;
   return cost;
@@ -254,6 +262,14 @@ auto RDP::timingTriangle(const u64* ops, bool shade, bool texture, bool zbuffer)
   //span in 1-cycle mode (DK64 -3.2%) and nothing in 2-cycle mode (Beetle Adventure Racing: 0).
   if(timing.atomicPrim) cycles += timing.atomicCost;
   if(timing.antialias && timing.cycleType == 0) cycles += timing.aaSpanCost * (f64)spans;
+  if(!timing.memoryBound && timing.cycleType < 2) {
+    //a write-only triangle (no image read, no depth) pays for its command words on the console: a
+    //one-span triangle costs 26 clocks with edges only, 35 with shade and 65 with shade and texture,
+    //against 20 / 23 / 23 in the tables (rdp_timing v32)
+    cycles += timing.writeOnlyTri;
+    if(shade) cycles += timing.writeOnlyShade;
+    if(texture) cycles += timing.writeOnlyTexture;
+  }
   timingAdd(cycles);
 }
 
